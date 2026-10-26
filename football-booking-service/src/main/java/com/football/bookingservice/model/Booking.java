@@ -1,49 +1,72 @@
 package com.football.bookingservice.model;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
+@Entity
+@Table(name = "bookings")
 public class Booking {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Ten khach hang khong duoc de trong")
+    @NotBlank(message = "Tên khách hàng không được để trống")
+    @Column(name = "customer_name", nullable = false, length = 100)
     private String customerName;
 
-    @NotBlank(message = "So dien thoai khong duoc de trong")
+    @NotBlank(message = "Số điện thoại không được để trống")
+    @Column(name = "phone", nullable = false, length = 15)
     private String phone;
 
-    @NotBlank(message = "Ten san khong duoc de trong")
+    @NotBlank(message = "Tên sân không được để trống")
+    @Column(name = "field_name", nullable = false, length = 100)
     private String fieldName;
 
-    @NotNull(message = "Ngay dat san khong duoc de trong")
+    @NotNull(message = "Ngày đặt sân không được để trống")
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @Column(name = "booking_date", nullable = false)
     private LocalDate bookingDate;
 
-    @NotNull(message = "Gio bat dau khong duoc de trong")
+    @NotNull(message = "Giờ bắt đầu không được để trống")
     @JsonFormat(pattern = "HH:mm")
+    @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
 
-    @NotNull(message = "Gio ket thuc khong duoc de trong")
+    @NotNull(message = "Giờ kết thúc không được để trống")
     @JsonFormat(pattern = "HH:mm")
+    @Column(name = "end_time", nullable = false)
     private LocalTime endTime;
 
-    @NotNull(message = "Gia thue khong duoc de trong")
-    @Positive(message = "Gia thue phai lon hon 0")
+    @NotNull(message = "Giá thuê không được để trống")
+    @Positive(message = "Giá thuê phải lớn hơn 0")
+    @Column(name = "price", nullable = false)
     private Double price;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
     private BookingStatus status;
+
+    @Column(name = "username", length = 50)
+    private String username;
 
     public Booking() {
     }
 
     public Booking(Long id, String customerName, String phone, String fieldName,
-            LocalDate bookingDate, LocalTime startTime, LocalTime endTime,
-            Double price, BookingStatus status) {
+                   LocalDate bookingDate, LocalTime startTime, LocalTime endTime,
+                   Double price, BookingStatus status) {
+        this(id, customerName, phone, fieldName, bookingDate, startTime, endTime, price, status, null);
+    }
+
+    public Booking(Long id, String customerName, String phone, String fieldName,
+                   LocalDate bookingDate, LocalTime startTime, LocalTime endTime,
+                   Double price, BookingStatus status, String username) {
         this.id = id;
         this.customerName = customerName;
         this.phone = phone;
@@ -53,6 +76,7 @@ public class Booking {
         this.endTime = endTime;
         this.price = price;
         this.status = status;
+        this.username = username;
     }
 
     public Long getId() {
@@ -125,5 +149,13 @@ public class Booking {
 
     public void setStatus(BookingStatus status) {
         this.status = status;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 }

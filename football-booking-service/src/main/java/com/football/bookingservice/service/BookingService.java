@@ -3,18 +3,28 @@ package com.football.bookingservice.service;
 import com.football.bookingservice.dto.*;
 import com.football.bookingservice.model.Booking;
 import com.football.bookingservice.model.BookingStatus;
+import com.football.bookingservice.repository.BookingRepository;
+import jakarta.annotation.PostConstruct;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 @Service
 public class BookingService {
 
+    /*
+    // =====================================================================================
+    // [CODE CŨ BUỔI 1 - BUỔI 3: LƯU TRỮ TẠM TRÊN BỘ NHỚ RAM (IN-MEMORY LIST)]
+    // Giảng viên yêu cầu comment lại để đối chiếu sự tiến hóa kiến trúc từ RAM sang Database
+    // =====================================================================================
     private final List<Booking> bookings = new ArrayList<>();
     private final AtomicLong idGenerator = new AtomicLong();
 
@@ -38,27 +48,69 @@ public class BookingService {
                 LocalDate.of(2026, 10, 15), LocalTime.of(20, 30), LocalTime.of(22, 0),
                 450000.0, BookingStatus.PAID));
     }
+    // =====================================================================================
+    */
 
+    // =====================================================================================
+    // [CODE MỚI BUỔI 4: PERSISTENCE LAYER VỚI SPRING DATA JPA & MYSQL DATABASE]
+    // =====================================================================================
+    private final BookingRepository bookingRepository;
+
+    public BookingService(BookingRepository bookingRepository) {
+        this.bookingRepository = bookingRepository;
+    }
+
+    // Tự động khởi tạo dữ liệu mẫu vào MySQL nếu bảng rỗng
+    @PostConstruct
+    @Transactional
+    public void initSeedData() {
+        if (bookingRepository.count() == 0) {
+            bookingRepository.saveAll(List.of(
+                    new Booking(null, "Nguyen Van An", "0901234567", "San 7 nguoi so 1",
+                            LocalDate.of(2026, 10, 10), LocalTime.of(18, 0), LocalTime.of(19, 30),
+                            300000.0, BookingStatus.CONFIRMED, "customer01"),
+                    new Booking(null, "Tran Thi Binh", "0912345678", "San 7 nguoi so 2",
+                            LocalDate.of(2026, 10, 11), LocalTime.of(20, 0), LocalTime.of(21, 30),
+                            350000.0, BookingStatus.PENDING, "customer02"),
+                    new Booking(null, "Le Van Cuong", "0923456789", "San 7 nguoi so 1",
+                            LocalDate.of(2026, 10, 12), LocalTime.of(17, 30), LocalTime.of(19, 0),
+                            280000.0, BookingStatus.PAID, "customer01"),
+                    new Booking(null, "Pham Minh Duc", "0934567890", "San 11 nguoi VIP",
+                            LocalDate.of(2026, 10, 13), LocalTime.of(19, 0), LocalTime.of(20, 30),
+                            400000.0, BookingStatus.CONFIRMED, "customer02"),
+                    new Booking(null, "Hoang Thu Ha", "0945678901", "San 5 nguoi so 2",
+                            LocalDate.of(2026, 10, 14), LocalTime.of(16, 0), LocalTime.of(17, 30),
+                            250000.0, BookingStatus.CANCELLED, "customer01"),
+                    new Booking(null, "Do Van Hung", "0956789012", "San 7 nguoi so 1",
+                            LocalDate.of(2026, 10, 15), LocalTime.of(20, 30), LocalTime.of(22, 0),
+                            450000.0, BookingStatus.PAID, "customer02")
+            ));
+        }
+    }
+
+    @Transactional(readOnly = true)
     public List<Booking> findAll() {
-        return bookings;
+        return bookingRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public Optional<Booking> findById(Long id) {
-        return bookings.stream().filter(b -> b.getId().equals(id)).findFirst();
+        return bookingRepository.findById(id);
     }
 
+    // Nghiệp vụ tạo mới được quản lý trong Transaction
+    @Transactional
     public Booking create(Booking booking) {
-        booking.setId(idGenerator.incrementAndGet());
         if (booking.getStatus() == null) {
             booking.setStatus(BookingStatus.PENDING);
         }
-        bookings.add(booking);
-        return booking;
+        return bookingRepository.save(booking);
     }
 
-    // PUT: Cập nhật toàn bộ thông tin
+    // PUT: Cập nhật toàn bộ thông tin trong Transaction
+    @Transactional
     public Optional<Booking> update(Long id, Booking data) {
-        return findById(id).map(existing -> {
+        return bookingRepository.findById(id).map(existing -> {
             existing.setCustomerName(data.getCustomerName());
             existing.setPhone(data.getPhone());
             existing.setFieldName(data.getFieldName());
@@ -69,13 +121,14 @@ public class BookingService {
             if (data.getStatus() != null) {
                 existing.setStatus(data.getStatus());
             }
-            return existing;
+            return bookingRepository.save(existing);
         });
     }
 
-    // PATCH: Cập nhật một phần thông tin (Buổi 3 - Giai đoạn 1)
+    // PATCH: Cập nhật một phần thông tin trong Transaction
+    @Transactional
     public Optional<Booking> patch(Long id, BookingPatchRequest patchData) {
-        return findById(id).map(existing -> {
+        return bookingRepository.findById(id).map(existing -> {
             if (patchData.getCustomerName() != null) {
                 existing.setCustomerName(patchData.getCustomerName());
             }
@@ -100,73 +153,65 @@ public class BookingService {
             if (patchData.getStatus() != null) {
                 existing.setStatus(patchData.getStatus());
             }
-            return existing;
+            return bookingRepository.save(existing);
         });
     }
 
+    @Transactional
     public boolean delete(Long id) {
-        return bookings.removeIf(b -> b.getId().equals(id));
+        if (bookingRepository.existsById(id)) {
+            bookingRepository.deleteById(id);
+            return true;
+        }
+        return false;
     }
 
-    // Giai đoạn 4: Search, Filter, Sort, Pagination kết hợp
+    // Giai đoạn 4: Search, Filter, Sort, Pagination kết hợp trực tiếp qua Spring Data JPA
+    @Transactional(readOnly = true)
     public PageResponse<Booking> searchFilterSortPaged(String name, BookingStatus status,
                                                       String sort, int page, int size) {
         if (page < 0) page = 0;
         if (size <= 0) size = 10;
 
-        // 1. Filter theo tên và trạng thái
-        String keyword = (name == null) ? "" : name.trim().toLowerCase();
-        List<Booking> filtered = bookings.stream()
-                .filter(b -> keyword.isEmpty() || (b.getCustomerName() != null && b.getCustomerName().toLowerCase().contains(keyword)))
-                .filter(b -> status == null || b.getStatus() == status)
-                .collect(Collectors.toList());
-
-        // 2. Sorting
-        Comparator<Booking> comparator = Comparator.comparing(Booking::getId);
+        // Xử lý Dynamic Sort của Spring Data
+        Sort sortObj = Sort.by(Sort.Direction.ASC, "id");
         if (sort != null && !sort.isBlank()) {
             String[] parts = sort.split(",");
             String field = parts[0].trim();
-            boolean desc = parts.length > 1 && parts[1].trim().equalsIgnoreCase("desc");
-
-            switch (field) {
-                case "customerName":
-                    comparator = Comparator.comparing(b -> b.getCustomerName() != null ? b.getCustomerName() : "");
-                    break;
-                case "price":
-                    comparator = Comparator.comparing(b -> b.getPrice() != null ? b.getPrice() : 0.0);
-                    break;
-                case "bookingDate":
-                    comparator = Comparator.comparing(b -> b.getBookingDate() != null ? b.getBookingDate() : LocalDate.MIN);
-                    break;
-                case "status":
-                    comparator = Comparator.comparing(b -> b.getStatus() != null ? b.getStatus().name() : "");
-                    break;
-                default:
-                    comparator = Comparator.comparing(Booking::getId);
-            }
-            if (desc) {
-                comparator = comparator.reversed();
-            }
+            Sort.Direction direction = (parts.length > 1 && parts[1].trim().equalsIgnoreCase("desc"))
+                    ? Sort.Direction.DESC
+                    : Sort.Direction.ASC;
+            sortObj = Sort.by(direction, field);
         }
-        filtered.sort(comparator);
 
-        // 3. Pagination
-        long totalElements = filtered.size();
-        int from = page * size;
-        List<Booking> pagedContent;
-        if (from >= totalElements) {
-            pagedContent = Collections.emptyList();
+        Pageable pageable = PageRequest.of(page, size, sortObj);
+        Page<Booking> pageResult;
+
+        boolean hasName = (name != null && !name.trim().isEmpty());
+        boolean hasStatus = (status != null);
+
+        if (hasName && hasStatus) {
+            pageResult = bookingRepository.findByCustomerNameContainingIgnoreCaseAndStatus(name.trim(), status, pageable);
+        } else if (hasName) {
+            pageResult = bookingRepository.findByCustomerNameContainingIgnoreCase(name.trim(), pageable);
+        } else if (hasStatus) {
+            pageResult = bookingRepository.findByStatus(status, pageable);
         } else {
-            int to = Math.min(from + size, (int) totalElements);
-            pagedContent = filtered.subList(from, to);
+            pageResult = bookingRepository.findAll(pageable);
         }
 
-        return new PageResponse<>(pagedContent, page, size, totalElements);
+        return new PageResponse<>(
+                pageResult.getContent(),
+                pageResult.getNumber(),
+                pageResult.getSize(),
+                pageResult.getTotalElements()
+        );
     }
 
-    // Giai đoạn 5: API Versioning (v2) - Tách tên thành firstName, lastName
+    // Giai đoạn 5: API Versioning (v2)
+    @Transactional(readOnly = true)
     public Optional<BookingV2DTO> findByIdV2(Long id) {
-        return findById(id).map(b -> {
+        return bookingRepository.findById(id).map(b -> {
             String fullName = b.getCustomerName() != null ? b.getCustomerName() : "";
             String[] parts = fullName.trim().split("\\s+");
             String lastName = parts.length > 0 ? parts[0] : "";
@@ -188,8 +233,9 @@ public class BookingService {
     }
 
     // Thử thách 1: Nested Resource (GET /api/v1/bookings/{id}/payments)
+    @Transactional(readOnly = true)
     public List<PaymentNestedDTO> findPaymentsByBookingId(Long bookingId) {
-        return findById(bookingId).map(b -> {
+        return bookingRepository.findById(bookingId).map(b -> {
             List<PaymentNestedDTO> list = new ArrayList<>();
             if (b.getStatus() == BookingStatus.PAID) {
                 list.add(new PaymentNestedDTO(
@@ -216,22 +262,58 @@ public class BookingService {
         }).orElse(Collections.emptyList());
     }
 
+    @Transactional(readOnly = true)
     public StatisticsResponse statistics() {
-        long total = bookings.size();
-        double revenue = bookings.stream()
-                .filter(b -> b.getStatus() == BookingStatus.PAID)
-                .mapToDouble(b -> b.getPrice() == null ? 0 : b.getPrice())
-                .sum();
+        long total = bookingRepository.count();
+        Double revenue = bookingRepository.sumPaidRevenue();
         return new StatisticsResponse(
                 total,
-                count(BookingStatus.PENDING),
-                count(BookingStatus.CONFIRMED),
-                count(BookingStatus.PAID),
-                count(BookingStatus.CANCELLED),
-                revenue);
+                bookingRepository.countByStatus(BookingStatus.PENDING),
+                bookingRepository.countByStatus(BookingStatus.CONFIRMED),
+                bookingRepository.countByStatus(BookingStatus.PAID),
+                bookingRepository.countByStatus(BookingStatus.CANCELLED),
+                revenue != null ? revenue : 0.0);
     }
 
-    private long count(BookingStatus status) {
-        return bookings.stream().filter(b -> b.getStatus() == status).count();
+    // =====================================================================================
+    // [BUỔI THỰC HÀNH 5: KIỂM TRA PHÂN QUYỀN SỞ HỮU TÀI NGUYÊN (RESOURCE OWNERSHIP)]
+    // =====================================================================================
+    public void verifyBookingOwnership(Booking booking, org.springframework.security.core.userdetails.UserDetails userDetails) {
+        if (userDetails == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Yêu cầu đăng nhập để truy cập tài nguyên");
+        }
+
+        // Quyền quản trị và Chủ sân được phép xem mọi đơn đặt sân
+        boolean isPrivileged = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_FIELD_OWNER"));
+        if (isPrivileged) {
+            return;
+        }
+
+        // Đối với Khách hàng (ROLE_CUSTOMER): CHỈ được xem đơn đặt sân do chính mình sở hữu
+        String currentUsername = userDetails.getUsername();
+        boolean isOwner = (booking.getUsername() != null && booking.getUsername().equalsIgnoreCase(currentUsername));
+
+        if (!isOwner && userDetails instanceof com.football.bookingservice.security.CustomUserDetails customUserDetails) {
+            if (booking.getPhone() != null && booking.getPhone().equals(customUserDetails.getPhone())) {
+                isOwner = true;
+            }
+        }
+
+        if (!isOwner) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Bị từ chối truy cập (403 Forbidden): Bạn không có quyền truy cập lịch đặt sân của khách hàng khác (Vi phạm kiểm tra quyền sở hữu tài nguyên)");
+        }
+    }
+
+    // Kiểm tra điều kiện nghiệp vụ kết hợp phân quyền khi hủy lịch đặt sân
+    public void verifyBookingCancellation(Booking booking, org.springframework.security.core.userdetails.UserDetails userDetails) {
+        // 1. Phải thỏa mãn kiểm tra quyền sở hữu trước
+        verifyBookingOwnership(booking, userDetails);
+
+        // 2. Kiểm tra điều kiện nghiệp vụ: Không cho phép hủy lịch đặt sân đã thanh toán (PAID)
+        if (booking.getStatus() == BookingStatus.PAID) {
+            throw new IllegalArgumentException("Không thể hủy lịch đặt sân đã thanh toán thành công (PAID). Vui lòng liên hệ ban quản lý để được hỗ trợ.");
+        }
     }
 }

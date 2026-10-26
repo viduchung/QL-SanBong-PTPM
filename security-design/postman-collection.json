@@ -1,0 +1,455 @@
+{
+  "info": {
+    "_postman_id": "football-security-collection-v5",
+    "name": "Football Booking System - Security & Authentication Tests (Lab 5)",
+    "description": "Bộ kiểm thử Postman tự động cho Buổi thực hành 5: Xác thực JWT, Phân quyền RBAC, Kiểm tra quyền sở hữu tài nguyên (Resource Ownership) và Giao tiếp liên dịch vụ.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "token_customer01",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_customer02",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_owner01",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_admin01",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Đăng nhập Customer 01 (Thành công)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Has accessToken', function () {",
+                  "    pm.expect(jsonData.accessToken).to.be.a('string');",
+                  "    pm.collectionVariables.set('token_customer01', jsonData.accessToken);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"customer01\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Đăng nhập Customer 02 (Thành công)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('token_customer02', jsonData.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"customer02\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Đăng nhập Chủ Sân owner01 (Thành công)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('token_owner01', jsonData.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"owner01\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Đăng nhập Sai Mật Khẩu (Bị từ chối 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"customer01\",\n  \"password\": \"WrongPassword999!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Authorization & Ownership Checks",
+      "item": [
+        {
+          "name": "Tra cứu sân bóng công khai (Public - Không cần Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "Xem chi tiết đơn mà KHÔNG gửi Token (401 Unauthorized)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "1"]
+            }
+          }
+        },
+        {
+          "name": "Customer 01 xem đơn ID=1 của CHÍNH MÌNH (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK (Chủ sở hữu được phép xem)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer01}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "1"]
+            }
+          }
+        },
+        {
+          "name": "Customer 01 xem trộm đơn ID=2 của Customer 02 (403 Forbidden)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 403 Forbidden (Vi phạm Resource Ownership)', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer01}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/2",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "2"]
+            }
+          }
+        },
+        {
+          "name": "Customer 01 hủy đơn ID=2 của Customer 02 (403 Forbidden)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 403 Forbidden (Không được hủy đơn người khác)', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer01}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/2",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "2"]
+            }
+          }
+        },
+        {
+          "name": "Customer 01 gọi API thống kê doanh thu (403 Forbidden)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 403 Forbidden (Customer không có quyền xem thống kê)', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer01}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/statistics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "statistics"]
+            }
+          }
+        },
+        {
+          "name": "Chủ sân owner01 gọi API thống kê doanh thu (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK (Chủ sân được xem thống kê)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_owner01}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/statistics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "statistics"]
+            }
+          }
+        },
+        {
+          "name": "Customer 01 hủy đơn ID=3 đã thanh toán (400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request (Vi phạm điều kiện nghiệp vụ: không hủy đơn PAID)', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer01}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "3"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Machine-to-Machine (Inter-Service)",
+      "item": [
+        {
+          "name": "Gọi nội bộ với X-Internal-Service-Key (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Service-Key",
+                "value": "FootballInternalSecretServiceKey2026"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/2",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "2"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -6,8 +6,39 @@
 
 const http = require('http');
 const url = require('url');
+const fs = require('fs');
+const path = require('path');
 
-const PORT = 8083;
+// Nạp cấu hình từ file .env tổng ở thư mục gốc
+function loadMasterEnv() {
+    const envPaths = [
+        path.resolve(__dirname, '../.env'),
+        path.resolve(__dirname, '.env')
+    ];
+    for (const p of envPaths) {
+        if (fs.existsSync(p)) {
+            const content = fs.readFileSync(p, 'utf8');
+            content.split(/\r?\n/).forEach(line => {
+                const trimmed = line.trim();
+                if (trimmed && !trimmed.startsWith('#')) {
+                    const idx = trimmed.indexOf('=');
+                    if (idx !== -1) {
+                        const key = trimmed.substring(0, idx).trim();
+                        const val = trimmed.substring(idx + 1).trim();
+                        if (!process.env[key]) {
+                            process.env[key] = val;
+                        }
+                    }
+                }
+            });
+            console.log(`[Notification Service] Da nap cau hinh tu file .env: ${p}`);
+            break;
+        }
+    }
+}
+loadMasterEnv();
+
+const PORT = parseInt(process.env.NOTIFICATION_SERVICE_PORT, 10) || 8083;
 const BOOKING_SERVICE_URL = process.env.BOOKING_SERVICE_URL || 'http://localhost:8081';
 
 // Luu tru thong bao trong RAM (In-memory)

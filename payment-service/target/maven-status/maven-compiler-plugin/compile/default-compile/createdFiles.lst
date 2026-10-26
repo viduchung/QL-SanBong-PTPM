@@ -13,3 +13,4 @@ com\football\paymentservice\exception\ResourceNotFoundException.class
 com\football\paymentservice\dto\PaymentRequest.class
 com\football\paymentservice\model\Payment.class
 com\football\paymentservice\model\PaymentMethod.class
+com\football\paymentservice\repository\PaymentRepository.class

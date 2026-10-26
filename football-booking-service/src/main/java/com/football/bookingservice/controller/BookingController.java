@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -74,23 +75,35 @@ public class BookingController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Lấy chi tiết đặt sân theo ID", description = "Truy vấn một bản ghi đặt sân cụ thể")
+    @Operation(summary = "Lấy chi tiết đặt sân theo ID (Kiểm tra quyền sở hữu)",
+               description = "Khách hàng chỉ xem được đơn của chính mình; Chủ sân và Admin được xem tất cả",
+               security = @SecurityRequirement(name = "BearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tìm thấy bản ghi"),
+            @ApiResponse(responseCode = "401", description = "Chưa đăng nhập hoặc token không hợp lệ"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập lịch đặt của người khác (Resource Ownership)"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy lịch đặt sân với ID tương ứng")
     })
-    public Booking getById(@PathVariable Long id) {
-        return bookingService.findById(id)
+    public Booking getById(@PathVariable Long id,
+                           @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        Booking booking = bookingService.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch đặt sân với id=" + id));
+        bookingService.verifyBookingOwnership(booking, userDetails);
+        return booking;
     }
 
     @PostMapping
-    @Operation(summary = "Tạo mới lịch đặt sân", description = "Tiếp nhận dữ liệu, kiểm tra Bean Validation và trả về mã 201 Created")
+    @Operation(summary = "Tạo mới lịch đặt sân (Tự động gán quyền sở hữu)",
+               description = "Tiếp nhận dữ liệu, kiểm tra Bean Validation và tự động liên kết với tài khoản đang đăng nhập",
+               security = @SecurityRequirement(name = "BearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Tạo mới thành công"),
-            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ vi phạm quy tắc validation")
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ vi phạm quy tắc validation"),
+            @ApiResponse(responseCode = "401", description = "Chưa đăng nhập")
     })
-    public ResponseEntity<Booking> create(@Valid @RequestBody BookingRequest request) {
+    public ResponseEntity<Booking> create(@Valid @RequestBody BookingRequest request,
+                                         @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        String ownerUsername = userDetails != null ? userDetails.getUsername() : null;
         Booking newBooking = new Booking(
                 null,
                 request.getCustomerName(),
@@ -100,20 +113,31 @@ public class BookingController {
                 request.getStartTime(),
                 request.getEndTime(),
                 request.getPrice(),
-                request.getStatus()
+                request.getStatus(),
+                ownerUsername
         );
         Booking created = bookingService.create(newBooking);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Cập nhật toàn bộ thông tin (PUT)", description = "Thay thế toàn bộ dữ liệu của lịch đặt sân bằng dữ liệu mới")
+    @Operation(summary = "Cập nhật toàn bộ thông tin (PUT - Kiểm tra quyền)",
+               description = "Chỉ chủ sở hữu hoặc quản trị viên/chủ sân mới được phép cập nhật",
+               security = @SecurityRequirement(name = "BearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu cập nhật không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Chưa đăng nhập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền sửa đơn của người khác"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy bản ghi để cập nhật")
     })
-    public Booking update(@PathVariable Long id, @Valid @RequestBody BookingRequest request) {
+    public Booking update(@PathVariable Long id,
+                          @Valid @RequestBody BookingRequest request,
+                          @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        Booking existing = bookingService.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch đặt sân với id=" + id));
+        bookingService.verifyBookingOwnership(existing, userDetails);
+
         Booking data = new Booking(
                 id,
                 request.getCustomerName(),
@@ -123,7 +147,8 @@ public class BookingController {
                 request.getStartTime(),
                 request.getEndTime(),
                 request.getPrice(),
-                request.getStatus()
+                request.getStatus(),
+                existing.getUsername()
         );
         return bookingService.update(id, data)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch đặt sân với id=" + id));
@@ -131,29 +156,58 @@ public class BookingController {
 
     // Giai đoạn 1 & 2: Cập nhật một phần (PATCH)
     @PatchMapping("/{id}")
-    @Operation(summary = "Cập nhật một phần (PATCH)", description = "Chỉ cập nhật những trường được truyền trong body (không bắt buộc nhập lại toàn bộ)")
+    @Operation(summary = "Cập nhật một phần (PATCH - Kiểm tra quyền)",
+               description = "Chỉ cập nhật những trường được truyền trong body. Duyệt CONFIRMED yêu cầu ROLE_FIELD_OWNER hoặc ROLE_ADMIN",
+               security = @SecurityRequirement(name = "BearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cập nhật một phần thành công"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu patch không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Chưa đăng nhập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền sửa đổi hoặc không có quyền duyệt"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy bản ghi")
     })
-    public Booking patch(@PathVariable Long id, @Valid @RequestBody BookingPatchRequest request) {
+    public Booking patch(@PathVariable Long id,
+                         @Valid @RequestBody BookingPatchRequest request,
+                         @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        Booking existing = bookingService.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch đặt sân với id=" + id));
+        bookingService.verifyBookingOwnership(existing, userDetails);
+
+        // Kiểm tra phân quyền: Nếu cập nhật trạng thái sang CONFIRMED, người dùng phải là FIELD_OWNER hoặc ADMIN
+        if (request.getStatus() == BookingStatus.CONFIRMED) {
+            boolean canApprove = userDetails.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_FIELD_OWNER") || a.getAuthority().equals("ROLE_ADMIN"));
+            if (!canApprove) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Bị từ chối truy cập (403 Forbidden): Chỉ Chủ sân (ROLE_FIELD_OWNER) hoặc Quản trị viên (ROLE_ADMIN) mới có quyền duyệt đơn đặt sân sang CONFIRMED.");
+            }
+        }
+
         return bookingService.patch(id, request)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch đặt sân với id=" + id));
     }
 
-    // Giai đoạn 2: Chuẩn hóa DELETE trả về 204 No Content
+    // Giai đoạn 2: Chuẩn hóa DELETE trả về 204 No Content kết hợp kiểm tra quyền sở hữu & điều kiện hủy
     @DeleteMapping("/{id}")
-    @Operation(summary = "Xóa lịch đặt sân", description = "Xóa bản ghi theo ID và trả về mã chuẩn HTTP 204 No Content")
+    @Operation(summary = "Hủy lịch đặt sân (Kiểm tra quyền sở hữu & điều kiện hủy)",
+               description = "Khách hàng chỉ hủy được đơn của mình khi chưa thanh toán (PAID). Admin có quyền hủy bất kỳ",
+               security = @SecurityRequirement(name = "BearerAuth"))
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Xóa thành công, không có nội dung trả về"),
+            @ApiResponse(responseCode = "204", description = "Hủy thành công, không có nội dung trả về"),
+            @ApiResponse(responseCode = "400", description = "Vi phạm điều kiện nghiệp vụ (ví dụ: đã thanh toán PAID)"),
+            @ApiResponse(responseCode = "401", description = "Chưa đăng nhập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền hủy đơn đặt sân của người khác"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy bản ghi để xóa")
     })
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        boolean deleted = bookingService.delete(id);
-        if (!deleted) {
-            throw new ResourceNotFoundException("Không tìm thấy lịch đặt sân với id=" + id);
-        }
+    public ResponseEntity<Void> delete(@PathVariable Long id,
+                                       @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        Booking existing = bookingService.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch đặt sân với id=" + id));
+
+        // Kiểm tra quyền sở hữu và điều kiện hủy
+        bookingService.verifyBookingCancellation(existing, userDetails);
+
+        bookingService.delete(id);
         return ResponseEntity.noContent().build();
     }
 

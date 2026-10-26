@@ -13,3 +13,4 @@ C:\Users\abinh\Downloads\football-booking-service\payment-service\src\main\java\
 C:\Users\abinh\Downloads\football-booking-service\payment-service\src\main\java\com\football\paymentservice\dto\BookingDTO.java
 C:\Users\abinh\Downloads\football-booking-service\payment-service\src\main\java\com\football\paymentservice\exception\GatewayTimeoutException.java
 C:\Users\abinh\Downloads\football-booking-service\payment-service\src\main\java\com\football\paymentservice\model\PaymentStatus.java
+C:\Users\abinh\Downloads\football-booking-service\payment-service\src\main\java\com\football\paymentservice\repository\PaymentRepository.java

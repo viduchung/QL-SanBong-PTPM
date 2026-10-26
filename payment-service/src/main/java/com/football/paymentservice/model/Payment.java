@@ -1,20 +1,40 @@
 package com.football.paymentservice.model;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "payments")
 public class Payment {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    // Logical ID tham chiếu sang Booking Service qua REST API (không tạo FK vật lý)
+    @Column(name = "booking_id", nullable = false)
     private Long bookingId;
+
+    @Column(name = "amount", nullable = false)
     private Double amount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, length = 20)
     private PaymentMethod paymentMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
     private PaymentStatus status;
+
+    @Column(name = "transaction_code", nullable = false, unique = true, length = 50)
     private String transactionCode;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Column(name = "payment_time", nullable = false)
     private LocalDateTime paymentTime;
 
+    @Column(name = "note", length = 255)
     private String note;
 
     public Payment() {

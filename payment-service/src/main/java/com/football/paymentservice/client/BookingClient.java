@@ -15,15 +15,20 @@ import java.net.SocketTimeoutException;
 public class BookingClient {
 
     private final RestClient bookingRestClient;
+    private final String internalServiceKey;
 
-    public BookingClient(RestClient bookingRestClient) {
+    public BookingClient(
+            RestClient bookingRestClient,
+            @org.springframework.beans.factory.annotation.Value("${internal.service.key:FootballInternalSecretServiceKey2026}") String internalServiceKey) {
         this.bookingRestClient = bookingRestClient;
+        this.internalServiceKey = internalServiceKey;
     }
 
     public BookingDTO getBookingById(Long bookingId) {
         try {
             return bookingRestClient.get()
                     .uri("/api/bookings/{id}", bookingId)
+                    .header("X-Internal-Service-Key", internalServiceKey)
                     .retrieve()
                     .onStatus(status -> status.value() == 404, (request, response) -> {
                         throw new ResourceNotFoundException("Không tìm thấy lịch đặt sân id=" + bookingId + " để thanh toán");
